@@ -4,13 +4,10 @@
 # ///
 
 """
-Read the file in data/, make one picture, save it to out/.
+Read the raw elephant tracking data and make a first exploratory picture.
 
+Run:
     uv run plot.py
-
-Three parts, and you will replace all three: rows() reads the file the way *your*
-file needs reading, the loop in main() picks the numbers out of it, and the plot at
-the bottom is the transformation you chose. Print before you plot.
 """
 
 import csv
@@ -18,48 +15,74 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-FILE = "hko-daily-mean-temperature-2026.csv"   # CHANGE ME: the same name as in fetch.py
-PICTURE = "plot.png"                           # what goes into out/, and into the README
+
+FILE = "ThermochronTracking Elephants Kruger 2007.csv"
+PICTURE = "first-elephant-movement.png"
 
 HERE = Path(__file__).parent
 DATA = HERE / "data" / FILE
 OUT = HERE / "out"
 
 
-def rows(path):
-    """The file as a list of lists, one per line. The Observatory puts three lines
-    of titles above the table and a legend below it, so keep only the lines that
-    start with a year."""
-    kept = []
+def read_elephants(path):
+    """Read GPS locations and group them by elephant ID."""
+    elephants = {}
+
     with path.open(encoding="utf-8-sig", newline="") as handle:
-        for line in csv.reader(handle):
-            if line and line[0].isdigit():
-                kept.append(line)
-    return kept
+        reader = csv.DictReader(handle)
+
+        for row in reader:
+            elephant_id = row["individual-local-identifier"]
+            longitude = float(row["location-long"])
+            latitude = float(row["location-lat"])
+
+            if elephant_id not in elephants:
+                elephants[elephant_id] = []
+
+            elephants[elephant_id].append((longitude, latitude))
+
+    return elephants
+
+
+def draw_path(ax, elephant_id, points):
+    """Draw the movement path of one elephant."""
+    longitudes = [point[0] for point in points]
+    latitudes = [point[1] for point in points]
+
+    ax.plot(
+        longitudes,
+        latitudes,
+        linewidth=0.5,
+        alpha=0.65,
+        label=elephant_id,
+    )
 
 
 def main():
-    table = rows(DATA)
-    print(f"{DATA.name}: {len(table)} rows. The first one: {table[0]}")
+    elephants = read_elephants(DATA)
 
-    days, values = [], []
-    for i, (year, month, day, value, quality) in enumerate(table):   # the loop over the numbers
-        if value == "***":                   # the Observatory's word for "missing"
-            continue
-        days.append(i + 1)
-        values.append(float(value))          # it arrived as text; make it a number
-    print(f"{len(values)} values, from {min(values)} to {max(values)}")
+    print(f"{len(elephants)} elephants found")
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(days, values, color="#d6591d", linewidth=1.5)
-    ax.set_xlabel("day of 2026")
-    ax.set_ylabel("daily mean temperature, °C")
-    ax.set_title("Hong Kong Observatory, 2026 so far")
-    fig.tight_layout()
+    for elephant_id, points in elephants.items():
+        print(f"{elephant_id}: {len(points)} locations")
+
+    fig, ax = plt.subplots(figsize=(9, 11))
+
+    for elephant_id, points in elephants.items():
+        draw_path(ax, elephant_id, points)
+
+    ax.set_xlabel("longitude")
+    ax.set_ylabel("latitude")
+    ax.set_title("Elephant movement — Kruger National Park, 2007–2009")
+    ax.legend(fontsize=7)
+    ax.set_aspect("equal", adjustable="box")
 
     OUT.mkdir(exist_ok=True)
+    fig.tight_layout()
     fig.savefig(OUT / PICTURE, dpi=150)
-    print(f"saved out/{PICTURE}")
+
+    print(f"saved {OUT / PICTURE}")
+
     plt.show()
 
 
