@@ -1,14 +1,20 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = []
+# dependencies = [
+#   "matplotlib",
+# ]
 # ///
 
 import csv
 from pathlib import Path
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
+from statistics import median
+
+import matplotlib.pyplot as plt
 
 DATA = Path("data/ThermochronTracking Elephants Kruger 2007.csv")
+OUTPUT = Path("out/temperature-movement.png")
 
 
 def distance_km(lat1, lon1, lat2, lon2):
@@ -62,9 +68,9 @@ def group_by_elephant(rows):
 
 def build_valid_steps(elephant_rows):
     """
-    Keep consecutive GPS records approximately 30 minutes apart.
+    Build comparable movement steps using consecutive
+    GPS records approximately 30 minutes apart.
     """
-
     valid_steps = []
 
     for elephant_id in sorted(elephant_rows):
@@ -128,84 +134,135 @@ def build_valid_steps(elephant_rows):
     return valid_steps
 
 
-def percentile(values, percentage):
-    """Calculate a percentile without extra libraries."""
+def make_temperature_bins(valid_steps):
+    """
+    Group movement steps into 1-degree temperature bins.
+    """
+    bins = {}
 
-    values = sorted(values)
+    for step in valid_steps:
+        temperature_bin = round(step["temperature"])
 
-    position = (len(values) - 1) * percentage
+        if temperature_bin not in bins:
+            bins[temperature_bin] = []
 
-    lower_index = int(position)
-    upper_index = min(lower_index + 1, len(values) - 1)
+        bins[temperature_bin].append(
+            step["displacement_km"]
+        )
 
-    fraction = position - lower_index
+    return bins
 
-    lower_value = values[lower_index]
-    upper_value = values[upper_index]
 
-    return lower_value + (
-        upper_value - lower_value
-    ) * fraction
+def plot_temperature_movement(bins):
+    temperatures = sorted(bins.keys())
+
+    median_displacements = []
+    counts = []
+
+    for temperature in temperatures:
+        values = bins[temperature]
+
+        median_displacements.append(
+            median(values)
+        )
+
+        counts.append(
+            len(values)
+        )
+
+    fig, (ax1, ax2) = plt.subplots(
+        2,
+        1,
+        figsize=(11, 8),
+        sharex=True,
+        height_ratios=[3, 1],
+    )
+
+    # Top: median movement
+    ax1.plot(
+        temperatures,
+        median_displacements,
+        marker="o",
+    )
+
+    ax1.set_ylabel(
+        "Median ~30-min displacement (km)"
+    )
+
+    ax1.set_title(
+        "Elephant Movement Across External Temperature"
+    )
+
+    ax1.grid(
+        alpha=0.25
+    )
+
+    # Bottom: number of observations
+    ax2.bar(
+        temperatures,
+        counts,
+    )
+
+    ax2.set_xlabel(
+        "External temperature (°C)"
+    )
+
+    ax2.set_ylabel(
+        "Steps"
+    )
+
+    ax2.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    fig.suptitle(
+        "14 tracked elephants, Kruger National Park",
+        fontsize=10,
+        y=0.94,
+    )
+
+    plt.tight_layout()
+
+    OUTPUT.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    plt.savefig(
+        OUTPUT,
+        dpi=200,
+        bbox_inches="tight",
+    )
+
+    plt.show()
 
 
 def main():
     rows = read_data()
     elephant_rows = group_by_elephant(rows)
     valid_steps = build_valid_steps(elephant_rows)
+    bins = make_temperature_bins(valid_steps)
 
-    displacements = []
+    print("TEMPERATURE × MOVEMENT")
+    print("----------------------")
+    print("Valid steps:", len(valid_steps))
+    print("Temperature bins:", len(bins))
 
-    for step in valid_steps:
-        displacements.append(step["displacement_km"])
+    print("\nTemperature | Median displacement | Steps")
 
-    print("MOVEMENT DISTRIBUTION")
-    print("---------------------")
+    for temperature in sorted(bins):
+        values = bins[temperature]
 
-    print("Total records:", len(rows))
-    print("Elephants:", len(elephant_rows))
-    print("Valid ~30-minute steps:", len(valid_steps))
+        print(
+            temperature,
+            "C |",
+            round(median(values), 4),
+            "km |",
+            len(values),
+        )
 
-    print(
-        "\nMean:",
-        round(sum(displacements) / len(displacements), 4),
-        "km",
-    )
-
-    print(
-        "Median:",
-        round(percentile(displacements, 0.50), 4),
-        "km",
-    )
-
-    print(
-        "90th percentile:",
-        round(percentile(displacements, 0.90), 4),
-        "km",
-    )
-
-    print(
-        "95th percentile:",
-        round(percentile(displacements, 0.95), 4),
-        "km",
-    )
-
-    print(
-        "99th percentile:",
-        round(percentile(displacements, 0.99), 4),
-        "km",
-    )
-
-    print(
-        "99.9th percentile:",
-        round(percentile(displacements, 0.999), 4),
-        "km",
-    )
-
-    print(
-        "Maximum:",
-        round(max(displacements), 4),
-        "km",
-    )
+    plot_temperature_movement(bins)
 
 
 if __name__ == "__main__":
