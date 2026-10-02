@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
@@ -20,8 +21,10 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+
             background: #07090a;
             color: #e3e8e5;
+
             font-family:
                 Arial,
                 Helvetica,
@@ -31,112 +34,226 @@
         canvas {
             position: absolute;
             inset: 0;
+
             width: 100%;
             height: 100%;
+
             cursor: crosshair;
         }
 
         .title {
             position: fixed;
-            top: 38px;
-            left: 52px;
+            top: 36px;
+            left: 50px;
+
             z-index: 10;
             pointer-events: none;
         }
 
         .title h1 {
             margin: 0;
+
             font-size: 25px;
             font-weight: 500;
+
             letter-spacing: 0.02em;
         }
 
         .subtitle {
             margin-top: 8px;
+
             font-family: monospace;
             font-size: 10px;
+
             color: #89938f;
+
             letter-spacing: 0.05em;
         }
 
         .finding {
             margin-top: 20px;
+
             font-family: monospace;
             font-size: 10px;
+
             color: #79e1d3;
+
             letter-spacing: 0.04em;
         }
 
         .instruction {
             margin-top: 7px;
+
             font-family: monospace;
             font-size: 9px;
+
             line-height: 1.6;
+
             color: #89938f;
         }
 
-        .status {
+        .right-panel {
             position: fixed;
+
+            top: 38px;
             right: 46px;
-            top: 42px;
+
+            width: 265px;
+
             z-index: 10;
 
-            min-width: 220px;
-
             font-family: monospace;
-            font-size: 10px;
-            line-height: 1.7;
-            color: #89938f;
 
             pointer-events: none;
         }
 
-        .status strong {
+        .time {
+            font-size: 30px;
+            color: #e3e8e5;
+        }
+
+        .state {
+            margin-top: 7px;
+
+            font-size: 10px;
+            color: #79e1d3;
+
+            letter-spacing: 0.04em;
+        }
+
+        .movement {
+            margin-top: 6px;
+
+            font-size: 9px;
+            color: #89938f;
+
+            line-height: 1.5;
+        }
+
+        .rule {
+            margin-top: 20px;
+
+            height: 1px;
+
+            background: #26302d;
+        }
+
+        .meta {
+            margin-top: 15px;
+
+            font-size: 9px;
+
+            color: #89938f;
+
+            line-height: 1.8;
+        }
+
+        .meta strong {
             color: #e3e8e5;
             font-weight: 400;
         }
 
         .selected {
-            margin-top: 18px;
+            margin-top: 15px;
 
             padding-top: 12px;
-            border-top: 1px solid #26302d;
+
+            border-top:
+                1px solid #26302d;
 
             color: #79e1d3;
         }
 
-        .zoom-label {
+        .selected strong {
+            display: block;
+
+            margin-top: 5px;
+
+            color: #e3e8e5;
+
+            font-size: 13px;
+        }
+
+        .bottom-left {
             position: fixed;
-            left: 52px;
-            bottom: 38px;
+
+            left: 50px;
+            bottom: 35px;
+
             z-index: 10;
 
             font-family: monospace;
             font-size: 9px;
+
             color: #56615e;
 
             pointer-events: none;
+
+            line-height: 1.7;
         }
 
         .mode {
             color: #79e1d3;
         }
 
+        .play-indicator {
+            color: #79e1d3;
+        }
+
         .tooltip {
             position: fixed;
+
             display: none;
+
+            z-index: 20;
 
             padding: 7px 9px;
 
-            background: rgba(7, 9, 10, 0.88);
-            border: 1px solid rgba(121, 225, 211, 0.35);
+            background:
+                rgba(
+                    7,
+                    9,
+                    10,
+                    0.9
+                );
+
+            border:
+                1px solid
+                rgba(
+                    121,
+                    225,
+                    211,
+                    0.35
+                );
 
             font-family: monospace;
             font-size: 10px;
+
             color: #79e1d3;
 
             pointer-events: none;
-            z-index: 20;
+        }
+
+        .hint {
+            position: fixed;
+
+            right: 46px;
+            bottom: 35px;
+
+            z-index: 10;
+
+            max-width: 400px;
+
+            font-family: monospace;
+            font-size: 8px;
+
+            line-height: 1.5;
+
+            color: #56615e;
+
+            text-align: right;
+
+            pointer-events: none;
         }
     </style>
 </head>
@@ -146,63 +263,106 @@
     <canvas id="canvas"></canvas>
 
     <div class="title">
-        <h1>LIVING RHYTHMS</h1>
+        <h1>
+            LIVING RHYTHMS
+        </h1>
 
         <div class="subtitle">
             ELEPHANT MOVEMENT / KRUGER / 2007—2009
         </div>
 
         <div class="finding">
-            FROM COLLECTIVE PATTERN TO INDIVIDUAL TRAJECTORY
+            FROM COLLECTIVE RHYTHM TO INDIVIDUAL TRAJECTORY
         </div>
 
         <div class="instruction">
             SCROLL TO ZOOM<br>
-            HOVER OVER A TRAJECTORY TO REVEAL AN INDIVIDUAL
+            HOVER TO REVEAL AN INDIVIDUAL<br>
+            SPACE = PLAY / PAUSE
         </div>
     </div>
 
-    <div class="status">
 
-        <div>
-            TRACKED INDIVIDUALS
-            &nbsp;&nbsp;
-            <strong id="individualCount">--</strong>
+    <div class="right-panel">
+
+        <div
+            id="timeText"
+            class="time"
+        >
+            00:00
         </div>
 
-        <div>
-            DISPLAY POINTS
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <strong id="pointCount">--</strong>
+        <div
+            id="stateText"
+            class="state"
+        >
+            DAILY MOVEMENT
         </div>
 
-        <div>
-            SOURCE POINTS
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <strong id="sourceCount">--</strong>
+        <div
+            id="movementText"
+            class="movement"
+        >
+            MEDIAN ~30 MIN DISPLACEMENT
+            —
         </div>
 
-        <div class="selected">
+        <div class="rule"></div>
+
+        <div class="meta">
+
             <div>
-                ACTIVE INDIVIDUAL
+                TRACKED INDIVIDUALS
+                &nbsp;
+                <strong
+                    id="individualCount"
+                >
+                    --
+                </strong>
             </div>
 
             <div>
-                <strong id="activeId">
+                VALID ~30 MIN STEPS
+                &nbsp;
+                <strong
+                    id="stepCount"
+                >
+                    --
+                </strong>
+            </div>
+
+            <div>
+                DISPLAY MOVEMENT STEPS
+                &nbsp;
+                <strong
+                    id="displayStepCount"
+                >
+                    --
+                </strong>
+            </div>
+
+            <div class="selected">
+                ACTIVE INDIVIDUAL
+
+                <strong
+                    id="activeId"
+                >
                     NONE
                 </strong>
             </div>
-        </div>
 
+        </div>
     </div>
 
-    <div class="zoom-label">
+
+    <div class="bottom-left">
+
         VIEW:
         <span
             id="modeLabel"
             class="mode"
         >
-            MACRO / COLLECTIVE LANDSCAPE
+            MACRO / COLLECTIVE RHYTHM
         </span>
 
         &nbsp;&nbsp;/&nbsp;&nbsp;
@@ -211,7 +371,18 @@
         <span id="zoomValue">
             1.00×
         </span>
+
+        &nbsp;&nbsp;/&nbsp;&nbsp;
+
+        <span
+            id="playIndicator"
+            class="play-indicator"
+        >
+            PLAYING
+        </span>
+
     </div>
+
 
     <div
         id="tooltip"
@@ -219,29 +390,47 @@
     ></div>
 
 
+    <div class="hint">
+        MOVEMENT IS AGGREGATED BY SOUTH AFRICA LOCAL HOUR
+        ACROSS THE FULL STUDY PERIOD.
+        THIS IS NOT ONE REAL DAY.
+    </div>
+
+
 <script>
+
+/* ==========================================================
+   ELEMENTS
+========================================================== */
+
 const canvas =
-    document.getElementById("canvas");
+    document.getElementById(
+        "canvas"
+    );
 
 const ctx =
-    canvas.getContext("2d");
+    canvas.getContext(
+        "2d"
+    );
 
 const tooltip =
-    document.getElementById("tooltip");
+    document.getElementById(
+        "tooltip"
+    );
 
 const individualCount =
     document.getElementById(
         "individualCount"
     );
 
-const pointCount =
+const stepCount =
     document.getElementById(
-        "pointCount"
+        "stepCount"
     );
 
-const sourceCount =
+const displayStepCount =
     document.getElementById(
-        "sourceCount"
+        "displayStepCount"
     );
 
 const activeId =
@@ -259,29 +448,30 @@ const modeLabel =
         "modeLabel"
     );
 
+const timeText =
+    document.getElementById(
+        "timeText"
+    );
 
-const COLORS = {
-    background: "#07090A",
+const stateText =
+    document.getElementById(
+        "stateText"
+    );
 
-    historical:
-        "rgba(203, 200, 193, 0.075)",
+const movementText =
+    document.getElementById(
+        "movementText"
+    );
 
-    historicalZoom:
-        "rgba(203, 200, 193, 0.14)",
+const playIndicator =
+    document.getElementById(
+        "playIndicator"
+    );
 
-    teal:
-        "rgba(50, 199, 181, 0.32)",
 
-    tealZoom:
-        "rgba(50, 199, 181, 0.52)",
-
-    tealBright:
-        "rgba(121, 225, 211, 0.95)",
-
-    tealGlow:
-        "rgba(121, 225, 211, 0.18)"
-};
-
+/* ==========================================================
+   DATA
+========================================================== */
 
 let data = null;
 
@@ -289,15 +479,15 @@ let tracks = [];
 
 let bounds = null;
 
+let rhythm = null;
+
 let hoveredTrack = null;
 
 
-/*
-    Camera.
+/* ==========================================================
+   CAMERA
+========================================================== */
 
-    scale = additional user zoom
-    offsetX / offsetY = pan offset
-*/
 const camera = {
     scale: 1,
     offsetX: 0,
@@ -305,28 +495,94 @@ const camera = {
 };
 
 
-let mouse = {
+/* ==========================================================
+   MOUSE
+========================================================== */
+
+const mouse = {
     x: -1000,
     y: -1000
 };
 
 
+/* ==========================================================
+   TIME
+========================================================== */
+
+/*
+    15-minute visual steps.
+
+    0.00
+    0.25
+    0.50
+    0.75
+    1.00
+*/
+let currentTime = 0;
+
+const timeStep = 0.25;
+
+
+/*
+    One visual step every 100 ms.
+
+    Full 24h cycle:
+    96 steps × 100ms
+    ≈ 9.6 seconds
+*/
+const stepDuration = 100;
+
+
+let playing = true;
+
+let lastStepTime = 0;
+
+
+/* ==========================================================
+   COLOURS
+========================================================== */
+
+const BACKGROUND =
+    "#07090A";
+
+const HISTORICAL =
+    "rgba(203, 200, 193, 0.07)";
+
+const HISTORICAL_ZOOM =
+    "rgba(203, 200, 193, 0.18)";
+
+const TEAL =
+    "50, 199, 181";
+
+const TEAL_BRIGHT =
+    "121, 225, 211";
+
+
+/* ==========================================================
+   CANVAS
+========================================================== */
+
 function resizeCanvas() {
 
     const dpr =
-        window.devicePixelRatio || 1;
+        window.devicePixelRatio
+        || 1;
 
     canvas.width =
-        window.innerWidth * dpr;
+        window.innerWidth
+        * dpr;
 
     canvas.height =
-        window.innerHeight * dpr;
+        window.innerHeight
+        * dpr;
 
     canvas.style.width =
-        window.innerWidth + "px";
+        window.innerWidth
+        + "px";
 
     canvas.style.height =
-        window.innerHeight + "px";
+        window.innerHeight
+        + "px";
 
     ctx.setTransform(
         dpr,
@@ -336,10 +592,12 @@ function resizeCanvas() {
         0,
         0
     );
-
-    draw();
 }
 
+
+/* ==========================================================
+   TRANSFORM
+========================================================== */
 
 function calculateBaseTransform() {
 
@@ -349,9 +607,7 @@ function calculateBaseTransform() {
     const height =
         window.innerHeight;
 
-    /*
-        Leave some space for interface.
-    */
+
     const marginX =
         width * 0.13;
 
@@ -368,15 +624,12 @@ function calculateBaseTransform() {
         - bounds.min_lat;
 
 
-    /*
-        Approximate longitude correction
-        at Kruger latitude.
-    */
     const meanLat =
         (
             bounds.min_lat
             + bounds.max_lat
         ) / 2;
+
 
     const lonCorrection =
         Math.cos(
@@ -413,15 +666,19 @@ function calculateBaseTransform() {
     return {
         fitScale,
         lonCorrection,
+
         centerX:
-            width * 0.50,
+            width * 0.48,
+
         centerY:
             height * 0.53,
+
         meanLon:
             (
                 bounds.min_lon
                 + bounds.max_lon
             ) / 2,
+
         meanLat
     };
 }
@@ -456,29 +713,30 @@ function worldToScreen(
         * camera.scale;
 
 
-    const x =
-        base.centerX
-        + xWorld * scale
-        + camera.offsetX;
-
-
-    const y =
-        base.centerY
-        - yWorld * scale
-        + camera.offsetY;
-
-
     return {
-        x,
-        y
+        x:
+            base.centerX
+            + xWorld
+            * scale
+            + camera.offsetX,
+
+        y:
+            base.centerY
+            - yWorld
+            * scale
+            + camera.offsetY
     };
 }
 
 
+/* ==========================================================
+   BACKGROUND
+========================================================== */
+
 function drawBackground() {
 
     ctx.fillStyle =
-        COLORS.background;
+        BACKGROUND;
 
     ctx.fillRect(
         0,
@@ -488,6 +746,10 @@ function drawBackground() {
     );
 }
 
+
+/* ==========================================================
+   INDIVIDUAL TRACKS
+========================================================== */
 
 function drawTrack(
     track,
@@ -505,11 +767,6 @@ function drawTrack(
     }
 
 
-    /*
-        As user zooms in,
-        individual structure becomes stronger.
-    */
-
     const zoomStrength =
         Math.min(
             Math.max(
@@ -526,14 +783,21 @@ function drawTrack(
     if (selected) {
 
         ctx.strokeStyle =
-            COLORS.tealBright;
+            `rgba(
+                ${TEAL_BRIGHT},
+                0.98
+            )`;
 
         ctx.lineWidth =
-            1.15
-            + zoomStrength * 0.8;
+            1.1
+            + zoomStrength
+            * 0.9;
 
         ctx.shadowColor =
-            COLORS.tealBright;
+            `rgba(
+                ${TEAL_BRIGHT},
+                0.7
+            )`;
 
         ctx.shadowBlur =
             5;
@@ -541,9 +805,9 @@ function drawTrack(
     } else {
 
         const alpha =
-            0.075
+            0.06
             + zoomStrength
-            * 0.20;
+            * 0.19;
 
         ctx.strokeStyle =
             `rgba(
@@ -554,12 +818,11 @@ function drawTrack(
             )`;
 
         ctx.lineWidth =
-            0.35
+            0.32
             + zoomStrength
-            * 0.35;
+            * 0.34;
 
-        ctx.shadowBlur =
-            0;
+        ctx.shadowBlur = 0;
     }
 
 
@@ -602,81 +865,126 @@ function drawTrack(
 }
 
 
-function drawCollectiveGlow() {
+/* ==========================================================
+   CURRENT MOVEMENT
+========================================================== */
 
-    /*
-        At macro level:
-        subtle teal points make the
-        landscape feel like one system.
+function drawCurrentMovement() {
 
-        As we zoom in,
-        this layer fades away so
-        individual trajectories emerge.
-    */
-
-    const fade =
-        Math.max(
-            0,
-            1
-            - (
-                camera.scale
-                - 1
-            ) / 2.5
-        );
-
-
-    if (fade <= 0) {
+    if (!rhythm) {
         return;
     }
 
 
-    ctx.fillStyle =
-        `rgba(
-            50,
-            199,
-            181,
-            ${0.075 * fade}
-        )`;
+    const hour =
+        Math.floor(
+            currentTime
+        ) % 24;
 
 
-    for (const track of tracks) {
+    const segments =
+        rhythm
+            .hourly_segments[
+                String(hour)
+            ];
 
-        /*
-            Draw only some points here
-            because the tracks themselves
-            already contain the detailed data.
-        */
 
-        for (
-            let i = 0;
-            i < track.points.length;
-            i += 2
-        ) {
+    if (!segments) {
+        return;
+    }
 
-            const point =
-                track.points[i];
 
-            const p =
-                worldToScreen(
-                    point.lon,
-                    point.lat
-                );
+    /*
+        Macro movement is strongest
+        when zoomed out.
 
-            ctx.beginPath();
+        It gradually becomes less dominant
+        as individual trajectories emerge.
+    */
 
-            ctx.arc(
-                p.x,
-                p.y,
-                0.65,
-                0,
-                Math.PI * 2
+    const macroStrength =
+        Math.max(
+            0.20,
+            1
+            - (
+                camera.scale
+                - 1
+            ) / 4
+        );
+
+
+    const p95 =
+        rhythm.visual_p95;
+
+
+    for (const segment of segments) {
+
+        const start =
+            worldToScreen(
+                segment.x1,
+                segment.y1
             );
 
-            ctx.fill();
-        }
+        const end =
+            worldToScreen(
+                segment.x2,
+                segment.y2
+            );
+
+
+        const strength =
+            Math.min(
+                segment.movement
+                / p95,
+                1
+            );
+
+
+        const alpha =
+            (
+                0.08
+                + strength
+                * 0.55
+            )
+            * macroStrength;
+
+
+        const width =
+            0.28
+            + strength
+            * 0.8;
+
+
+        ctx.strokeStyle =
+            `rgba(
+                ${TEAL},
+                ${alpha}
+            )`;
+
+        ctx.lineWidth =
+            width;
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            start.x,
+            start.y
+        );
+
+        ctx.lineTo(
+            end.x,
+            end.y
+        );
+
+        ctx.stroke();
     }
 }
 
+
+/* ==========================================================
+   DRAW
+========================================================== */
 
 function draw() {
 
@@ -684,12 +992,14 @@ function draw() {
         return;
     }
 
+
     drawBackground();
 
 
     /*
-        Draw all unselected trajectories first.
+        1. Individual trajectory memory
     */
+
     for (const track of tracks) {
 
         if (
@@ -707,18 +1017,111 @@ function draw() {
     }
 
 
-    drawCollectiveGlow();
+    /*
+        2. Current aggregated movement
+    */
+
+    drawCurrentMovement();
 
 
     /*
-        Highlight hovered individual last.
+        3. Hover highlight
     */
+
     if (hoveredTrack) {
 
         drawTrack(
             hoveredTrack,
             true
         );
+    }
+
+
+    updateInterface();
+}
+
+
+/* ==========================================================
+   INTERFACE
+========================================================== */
+
+function updateInterface() {
+
+    const hour =
+        Math.floor(
+            currentTime
+        ) % 24;
+
+
+    const minute =
+        Math.round(
+            (
+                currentTime
+                - Math.floor(
+                    currentTime
+                )
+            )
+            * 60
+        );
+
+
+    timeText.textContent =
+        String(hour)
+            .padStart(
+                2,
+                "0"
+            )
+        + ":"
+        + String(minute)
+            .padStart(
+                2,
+                "0"
+            );
+
+
+    const currentMedian =
+        rhythm
+            .hourly_medians[
+                String(hour)
+            ];
+
+
+    movementText.textContent =
+        "MEDIAN ~30 MIN DISPLACEMENT  "
+        + Number(
+            currentMedian
+        ).toFixed(3)
+        + " KM";
+
+
+    if (
+        hour >= 2
+        && hour < 5
+    ) {
+
+        stateText.textContent =
+            "LOW ACTIVITY";
+
+    } else if (
+        hour >= 5
+        && hour < 8
+    ) {
+
+        stateText.textContent =
+            "MORNING RISE";
+
+    } else if (
+        hour >= 16
+        && hour < 18
+    ) {
+
+        stateText.textContent =
+            "LATE-AFTERNOON PEAK";
+
+    } else {
+
+        stateText.textContent =
+            "DAILY MOVEMENT";
     }
 
 
@@ -732,7 +1135,7 @@ function draw() {
     ) {
 
         modeLabel.textContent =
-            "MACRO / COLLECTIVE LANDSCAPE";
+            "MACRO / COLLECTIVE RHYTHM";
 
     } else if (
         camera.scale < 3.5
@@ -746,12 +1149,19 @@ function draw() {
         modeLabel.textContent =
             "MICRO / INDIVIDUAL TRAJECTORIES";
     }
+
+
+    playIndicator.textContent =
+        playing
+        ? "PLAYING"
+        : "PAUSED";
 }
 
 
-/*
-    Distance from cursor to a point.
-*/
+/* ==========================================================
+   HOVER
+========================================================== */
+
 function distance(
     x1,
     y1,
@@ -775,12 +1185,10 @@ function distance(
 function findHoveredTrack() {
 
     /*
-        Only activate individual hover
-        after a small amount of zoom.
-
-        This prevents the macro view
-        becoming noisy.
+        Only activate hover
+        after some zoom.
     */
+
     if (
         camera.scale < 1.45
     ) {
@@ -804,9 +1212,6 @@ function findHoveredTrack() {
         Infinity;
 
 
-    /*
-        Hover threshold in screen pixels.
-    */
     const threshold = 13;
 
 
@@ -816,18 +1221,12 @@ function findHoveredTrack() {
             track.points;
 
 
-        /*
-            We do not need to test
-            every single point for hover.
-
-            Sampling keeps interaction fast.
-        */
         const hoverStep =
             Math.max(
                 1,
                 Math.floor(
                     points.length
-                    / 1800
+                    / 1500
                 )
             );
 
@@ -887,18 +1286,17 @@ function findHoveredTrack() {
 
         tooltip.style.left =
             (
-                mouse.x + 16
+                mouse.x + 15
             ) + "px";
 
         tooltip.style.top =
             (
-                mouse.y + 16
+                mouse.y + 15
             ) + "px";
 
     } else {
 
-        hoveredTrack =
-            null;
+        hoveredTrack = null;
 
         activeId.textContent =
             "NONE";
@@ -909,34 +1307,10 @@ function findHoveredTrack() {
 }
 
 
-/*
-    Mouse movement.
-*/
-canvas.addEventListener(
-    "mousemove",
-    event => {
+/* ==========================================================
+   ZOOM
+========================================================== */
 
-        mouse.x =
-            event.clientX;
-
-        mouse.y =
-            event.clientY;
-
-        findHoveredTrack();
-
-        draw();
-    }
-);
-
-
-/*
-    Wheel zoom.
-
-    Zoom is centred approximately
-    around the mouse position,
-    rather than always around
-    the centre of the screen.
-*/
 canvas.addEventListener(
     "wheel",
     event => {
@@ -973,14 +1347,9 @@ canvas.addEventListener(
         }
 
 
-        /*
-            Adjust offset so the point
-            under the cursor approximately
-            stays beneath the cursor.
-        */
         const centerX =
             window.innerWidth
-            * 0.5;
+            * 0.48;
 
         const centerY =
             window.innerHeight
@@ -998,7 +1367,7 @@ canvas.addEventListener(
             - camera.offsetY;
 
 
-        const scaleRatio =
+        const ratio =
             newScale
             / oldScale;
 
@@ -1006,16 +1375,13 @@ canvas.addEventListener(
         camera.offsetX -=
             relativeX
             * (
-                scaleRatio
-                - 1
+                ratio - 1
             );
-
 
         camera.offsetY -=
             relativeY
             * (
-                scaleRatio
-                - 1
+                ratio - 1
             );
 
 
@@ -1033,9 +1399,30 @@ canvas.addEventListener(
 );
 
 
-/*
-    Double click resets view.
-*/
+/* ==========================================================
+   MOUSE
+========================================================== */
+
+canvas.addEventListener(
+    "mousemove",
+    event => {
+
+        mouse.x =
+            event.clientX;
+
+        mouse.y =
+            event.clientY;
+
+
+        findHoveredTrack();
+    }
+);
+
+
+/* ==========================================================
+   RESET
+========================================================== */
+
 canvas.addEventListener(
     "dblclick",
     () => {
@@ -1052,21 +1439,90 @@ canvas.addEventListener(
 
         tooltip.style.display =
             "none";
-
-        draw();
     }
 );
 
 
+/* ==========================================================
+   PLAY / PAUSE
+========================================================== */
+
 window.addEventListener(
-    "resize",
-    resizeCanvas
+    "keydown",
+    event => {
+
+        if (
+            event.code
+            === "Space"
+        ) {
+
+            event.preventDefault();
+
+            playing =
+                !playing;
+        }
+    }
 );
 
 
-/*
-    LOAD DATA
-*/
+/* ==========================================================
+   ANIMATION LOOP
+========================================================== */
+
+function animate(timestamp) {
+
+    if (
+        playing
+        && (
+            timestamp
+            - lastStepTime
+            >= stepDuration
+        )
+    ) {
+
+        currentTime +=
+            timeStep;
+
+
+        if (
+            currentTime >= 24
+        ) {
+
+            currentTime = 0;
+        }
+
+
+        lastStepTime =
+            timestamp;
+    }
+
+
+    draw();
+
+
+    requestAnimationFrame(
+        animate
+    );
+}
+
+
+/* ==========================================================
+   WINDOW
+========================================================== */
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        resizeCanvas();
+    }
+);
+
+
+/* ==========================================================
+   LOAD DATA
+========================================================== */
+
 async function loadData() {
 
     try {
@@ -1095,33 +1551,46 @@ async function loadData() {
         bounds =
             data.bounds;
 
+        rhythm =
+            data.rhythm;
+
 
         individualCount.textContent =
-            data.metadata
+            data
+                .metadata
                 .individual_count;
 
 
-        pointCount.textContent =
-            data.metadata
-                .interactive_point_count
+        stepCount.textContent =
+            data
+                .metadata
+                .valid_movement_step_count
                 .toLocaleString();
 
 
-        sourceCount.textContent =
-            data.metadata
-                .original_point_count
+        displayStepCount.textContent =
+            data
+                .metadata
+                .display_movement_step_count
                 .toLocaleString();
 
 
         resizeCanvas();
 
+
+        requestAnimationFrame(
+            animate
+        );
+
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
 
         ctx.fillStyle =
-            "#07090A";
+            BACKGROUND;
 
         ctx.fillRect(
             0,
@@ -1153,7 +1622,7 @@ async function loadData() {
 
 
         ctx.fillText(
-            "Run this page through a local server instead of opening the HTML file directly.",
+            "Run the page through the local HTTP server.",
             60,
             130
         );
@@ -1162,6 +1631,7 @@ async function loadData() {
 
 
 loadData();
+
 </script>
 
 </body>
