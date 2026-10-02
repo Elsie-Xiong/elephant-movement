@@ -26,7 +26,7 @@ DATA = Path(
 )
 
 OUTPUT = Path(
-    "out/living-rhythms-24h.gif"
+    "out/living-rhythms-continuous-flow-test.gif"
 )
 
 
@@ -118,10 +118,13 @@ def calculate_reference_point(tracks):
     latitudes = []
 
     for points in tracks.values():
+
         for point in points:
+
             longitudes.append(
                 point["longitude"]
             )
+
             latitudes.append(
                 point["latitude"]
             )
@@ -223,7 +226,10 @@ def percentile(
         len(values) - 1,
     )
 
-    weight = position - lower
+    weight = (
+        position
+        - lower
+    )
 
     return (
         values[lower]
@@ -234,7 +240,7 @@ def percentile(
 
 
 # ============================================================
-# PREPARE ANIMATION DATA
+# PREPARE DATA
 # ============================================================
 
 def build_animation_data(
@@ -304,7 +310,6 @@ def build_animation_data(
                 / 60
             )
 
-            # Only comparable ~30 min steps
             if not (
                 29 <= gap_minutes <= 31
             ):
@@ -320,10 +325,6 @@ def build_animation_data(
                     current["y"],
                 ),
             ]
-
-            historical_segments.append(
-                segment
-            )
 
             movement = distance_km(
                 previous["latitude"],
@@ -341,13 +342,20 @@ def build_animation_data(
                 / 2
             )
 
-            # South Africa local time = UTC + 2
             midpoint_local = (
                 midpoint_utc
-                + timedelta(hours=2)
+                + timedelta(
+                    hours=2
+                )
             )
 
-            hour = midpoint_local.hour
+            hour = (
+                midpoint_local.hour
+            )
+
+            historical_segments.append(
+                segment
+            )
 
             hourly_segments[
                 hour
@@ -366,7 +374,9 @@ def build_animation_data(
 
     hourly_medians = [
         median(
-            hourly_movements[hour]
+            hourly_movements[
+                hour
+            ]
         )
         for hour in range(24)
     ]
@@ -374,8 +384,11 @@ def build_animation_data(
     all_movements = []
 
     for hour in range(24):
+
         all_movements.extend(
-            hourly_movements[hour]
+            hourly_movements[
+                hour
+            ]
         )
 
     visual_p95 = percentile(
@@ -383,32 +396,80 @@ def build_animation_data(
         0.95,
     )
 
+    animated_segments = []
+
+    golden_ratio = (
+        0.61803398875
+    )
+
+    for hour in range(24):
+
+        items = hourly_segments[
+            hour
+        ]
+
+        for index, item in enumerate(
+            items
+        ):
+
+            offset = (
+                index
+                * golden_ratio
+            ) % 1.0
+
+            display_start = (
+                hour
+                + offset
+            )
+
+            animated_segments.append(
+                {
+                    "segment":
+                        item["segment"],
+
+                    "movement":
+                        item["movement"],
+
+                    "display_start":
+                        display_start,
+                }
+            )
+
     return {
-        "all_x": all_x,
-        "all_y": all_y,
+        "all_x":
+            all_x,
+
+        "all_y":
+            all_y,
+
         "historical_segments":
             historical_segments,
-        "hourly_segments":
-            hourly_segments,
+
         "hourly_medians":
             hourly_medians,
+
         "visual_p95":
             visual_p95,
+
+        "animated_segments":
+            animated_segments,
     }
 
 
 # ============================================================
-# CREATE FIGURE
+# ANIMATION
 # ============================================================
 
 def create_animation(
     tracks,
     data,
 ):
+
     fig = plt.figure(
         figsize=(16, 9),
         facecolor=BACKGROUND,
     )
+
 
     # ========================================================
     # LEFT — MOVEMENT LANDSCAPE
@@ -427,17 +488,14 @@ def create_animation(
         BACKGROUND
     )
 
-    # Long-term movement memory
-    historical_layer = (
-        LineCollection(
-            data[
-                "historical_segments"
-            ],
-            colors=HISTORICAL_LINE,
-            linewidths=0.12,
-            alpha=0.022,
-            zorder=1,
-        )
+    historical_layer = LineCollection(
+        data[
+            "historical_segments"
+        ],
+        colors=HISTORICAL_LINE,
+        linewidths=0.11,
+        alpha=0.020,
+        zorder=1,
     )
 
     map_ax.add_collection(
@@ -447,21 +505,20 @@ def create_animation(
     map_ax.scatter(
         data["all_x"],
         data["all_y"],
-        s=0.10,
+        s=0.09,
         color=HISTORICAL_POINT,
-        alpha=0.055,
+        alpha=0.045,
         linewidths=0,
         zorder=2,
     )
 
-    # Current hour layer
-    active_layer = LineCollection(
+    flowing_layer = LineCollection(
         [],
         zorder=5,
     )
 
     map_ax.add_collection(
-        active_layer
+        flowing_layer
     )
 
     map_ax.set_aspect(
@@ -480,11 +537,13 @@ def create_animation(
     )
 
     x_padding = (
-        x_max - x_min
+        x_max
+        - x_min
     ) * 0.015
 
     y_padding = (
-        y_max - y_min
+        y_max
+        - y_min
     ) * 0.015
 
     map_ax.set_xlim(
@@ -497,10 +556,13 @@ def create_animation(
         y_max + y_padding,
     )
 
-    map_ax.axis("off")
+    map_ax.axis(
+        "off"
+    )
+
 
     # ========================================================
-    # RIGHT — DAILY RHYTHM DIAL
+    # RIGHT — RHYTHM DIAL
     # ========================================================
 
     dial_ax = fig.add_axes(
@@ -529,8 +591,13 @@ def create_animation(
         "hourly_medians"
     ]
 
-    minimum_value = min(values)
-    maximum_value = max(values)
+    minimum_value = min(
+        values
+    )
+
+    maximum_value = max(
+        values
+    )
 
     value_range = (
         maximum_value
@@ -542,6 +609,7 @@ def create_animation(
     rhythm_radii = []
 
     for value in values:
+
         normalized = (
             value
             - minimum_value
@@ -549,10 +617,11 @@ def create_animation(
 
         rhythm_radii.append(
             base_radius
-            + normalized * 0.58
+            + normalized
+            * 0.58
         )
 
-    closed_values = (
+    closed_radii = (
         rhythm_radii
         + [
             rhythm_radii[0]
@@ -564,30 +633,34 @@ def create_animation(
         * math.pi
         * hour
         / 24
-        for hour in range(25)
+
+        for hour
+        in range(
+            25
+        )
     ]
 
-    # Base ring
     dial_ax.plot(
         closed_theta,
         [
             base_radius
-        ]
-        * len(closed_theta),
+        ] * len(
+            closed_theta
+        ),
         color=GRID_FAINT,
         linewidth=0.7,
         alpha=0.8,
         zorder=1,
     )
 
-    # Entire rhythm shown faintly
     dial_ax.fill_between(
         closed_theta,
         [
             base_radius
-        ]
-        * len(closed_theta),
-        closed_values,
+        ] * len(
+            closed_theta
+        ),
+        closed_radii,
         color=MOVEMENT_TEAL,
         alpha=0.055,
         zorder=1,
@@ -595,20 +668,23 @@ def create_animation(
 
     dial_ax.plot(
         closed_theta,
-        closed_values,
+        closed_radii,
         color=MOVEMENT_TEAL,
         linewidth=1.0,
         alpha=0.30,
         zorder=2,
     )
 
-    # Hour dots
     hour_angles = [
         2
         * math.pi
         * hour
         / 24
-        for hour in range(24)
+
+        for hour
+        in range(
+            24
+        )
     ]
 
     dial_ax.scatter(
@@ -621,7 +697,6 @@ def create_animation(
         zorder=1,
     )
 
-    # Current time pointer
     pointer_line, = (
         dial_ax.plot(
             [],
@@ -644,7 +719,6 @@ def create_animation(
         )
     )
 
-    # Growing trace
     progress_line, = (
         dial_ax.plot(
             [],
@@ -712,10 +786,13 @@ def create_animation(
 
     dial_ax.spines[
         "polar"
-    ].set_visible(False)
+    ].set_visible(
+        False
+    )
+
 
     # ========================================================
-    # INTERFACE TEXT
+    # TEXT
     # ========================================================
 
     fig.text(
@@ -771,8 +848,8 @@ def create_animation(
         0.055,
         0.811,
         (
-            "PALE = LONG-TERM MOVEMENT MEMORY  /  "
-            "TEAL = CURRENT LOCAL HOUR"
+            "EACH TEAL SEGMENT GROWS "
+            "FROM ITS START POINT TOWARD ITS END POINT"
         ),
         color=TEXT_SECONDARY,
         fontsize=5.4,
@@ -806,7 +883,6 @@ def create_animation(
         va="top",
     )
 
-    # Dynamic clock
     time_text = fig.text(
         0.805,
         0.765,
@@ -844,71 +920,96 @@ def create_animation(
         0.055,
         0.045,
         (
-            "THE ANIMATION DOES NOT REPRESENT ONE SINGLE DAY. "
-            "MOVEMENT SEGMENTS ARE GROUPED BY LOCAL HOUR "
-            "ACROSS THE FULL TRACKING PERIOD."
+            "THIS IS AN AGGREGATED 24-HOUR RHYTHM, NOT ONE REAL DAY. "
+            "DISPLAY TIMING WITHIN EACH HOUR IS STAGGERED ONLY "
+            "TO REVEAL MOVEMENT DIRECTION."
         ),
         color=TEXT_FAINT,
-        fontsize=4.8,
+        fontsize=4.7,
         family="monospace",
         ha="left",
         va="bottom",
     )
 
+
     # ========================================================
-    # ANIMATION LOGIC
+    # CONTINUOUS FLOW SETTINGS
     # ========================================================
 
     p95 = data[
         "visual_p95"
     ]
 
-    # 3 animation frames for every hour.
-    # Gives a smoother clock without pretending
-    # that the data itself has finer temporal resolution.
-    frames_per_hour = 3
+    # 4 visual frames per hour:
+    # 00:00 -> 00:15 -> 00:30 -> 00:45 -> 01:00
+    frames_per_hour = 4
 
     total_frames = (
         24
         * frames_per_hour
     )
 
+    # Segment lifecycle:
+    #
+    # 0.00 -> 0.38 h : grows
+    # 0.38 -> 0.55 h : remains visible
+    # 0.55 -> 1.10 h : fades away
+
+    grow_duration = 0.38
+    hold_until = 0.55
+    life_duration = 1.10
+
+
+    # ========================================================
+    # UPDATE
+    # ========================================================
+
     def update(frame):
 
-        fractional_hour = (
+        current_time = (
             frame
             / frames_per_hour
         )
 
-        current_hour = int(
-            fractional_hour
-        ) % 24
+        current_hour = (
+            int(current_time)
+            % 24
+        )
 
         minute = int(
             (
-                fractional_hour
-                - int(fractional_hour)
+                current_time
+                - int(current_time)
             )
             * 60
         )
 
-        # ----------------------------------------------------
-        # MAP
-        # ----------------------------------------------------
 
-        current_items = (
-            data[
-                "hourly_segments"
-            ][
-                current_hour
-            ]
-        )
+        # ====================================================
+        # CONTINUOUS MOVEMENT FLOW
+        # ====================================================
 
-        segments = []
+        visible_segments = []
         colors = []
         widths = []
 
-        for item in current_items:
+        for item in data[
+            "animated_segments"
+        ]:
+
+            start_time = (
+                item[
+                    "display_start"
+                ]
+            )
+
+            age = (
+                current_time
+                - start_time
+            ) % 24
+
+            if age > life_duration:
+                continue
 
             movement = (
                 item[
@@ -917,26 +1018,129 @@ def create_animation(
             )
 
             strength = min(
-                movement / p95,
+                movement
+                / p95,
                 1.0,
             )
 
-            alpha = (
-                0.09
-                + strength
-                * 0.62
-            )
-
-            width = (
-                0.20
-                + strength
-                * 0.65
-            )
-
-            segments.append(
+            original_segment = (
                 item[
                     "segment"
                 ]
+            )
+
+            x1, y1 = (
+                original_segment[0]
+            )
+
+            x2, y2 = (
+                original_segment[1]
+            )
+
+            # ------------------------------------------------
+            # GROW
+            # ------------------------------------------------
+
+            if age < grow_duration:
+
+                progress = (
+                    age
+                    / grow_duration
+                )
+
+                progress = (
+                    1
+                    - (
+                        1 - progress
+                    ) ** 2
+                )
+
+                end_x = (
+                    x1
+                    + (
+                        x2 - x1
+                    )
+                    * progress
+                )
+
+                end_y = (
+                    y1
+                    + (
+                        y2 - y1
+                    )
+                    * progress
+                )
+
+                alpha_phase = (
+                    0.35
+                    + 0.65
+                    * progress
+                )
+
+            # ------------------------------------------------
+            # HOLD
+            # ------------------------------------------------
+
+            elif age < hold_until:
+
+                end_x = x2
+                end_y = y2
+
+                alpha_phase = 1.0
+
+            # ------------------------------------------------
+            # FADE
+            # ------------------------------------------------
+
+            else:
+
+                end_x = x2
+                end_y = y2
+
+                fade_progress = (
+                    (
+                        age
+                        - hold_until
+                    )
+                    / (
+                        life_duration
+                        - hold_until
+                    )
+                )
+
+                alpha_phase = (
+                    1.0
+                    - fade_progress
+                )
+
+            visible_segments.append(
+                [
+                    (
+                        x1,
+                        y1,
+                    ),
+                    (
+                        end_x,
+                        end_y,
+                    ),
+                ]
+            )
+
+            base_alpha = (
+                0.08
+                + strength
+                * 0.72
+            )
+
+            final_alpha = (
+                base_alpha
+                * alpha_phase
+            )
+
+            width = (
+                0.18
+                + strength
+                * 0.78
             )
 
             colors.append(
@@ -944,7 +1148,7 @@ def create_animation(
                     0.196,
                     0.780,
                     0.710,
-                    alpha,
+                    final_alpha,
                 )
             )
 
@@ -952,33 +1156,53 @@ def create_animation(
                 width
             )
 
-        active_layer.set_segments(
-            segments
+        flowing_layer.set_segments(
+            visible_segments
         )
 
-        active_layer.set_color(
+        flowing_layer.set_color(
             colors
         )
 
-        active_layer.set_linewidth(
+        flowing_layer.set_linewidth(
             widths
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # DIAL
-        # ----------------------------------------------------
+        # ====================================================
 
         current_angle = (
             2
             * math.pi
-            * fractional_hour
+            * current_time
             / 24
+        )
+
+        next_hour = (
+            current_hour
+            + 1
+        ) % 24
+
+        fraction = (
+            current_time
+            - int(
+                current_time
+            )
         )
 
         current_radius = (
             rhythm_radii[
                 current_hour
             ]
+            * (
+                1 - fraction
+            )
+            + rhythm_radii[
+                next_hour
+            ]
+            * fraction
         )
 
         pointer_line.set_data(
@@ -1001,9 +1225,9 @@ def create_animation(
             ]
         )
 
-        # Draw completed rhythm trace
         completed_hours = (
-            current_hour + 1
+            current_hour
+            + 1
         )
 
         progress_theta = [
@@ -1011,6 +1235,7 @@ def create_animation(
             * math.pi
             * hour
             / 24
+
             for hour in range(
                 completed_hours
             )
@@ -1027,9 +1252,10 @@ def create_animation(
             progress_radius,
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # TEXT
-        # ----------------------------------------------------
+        # ====================================================
 
         time_text.set_text(
             f"{current_hour:02d}:{minute:02d}"
@@ -1039,6 +1265,13 @@ def create_animation(
             values[
                 current_hour
             ]
+            * (
+                1 - fraction
+            )
+            + values[
+                next_hour
+            ]
+            * fraction
         )
 
         movement_text.set_text(
@@ -1048,35 +1281,42 @@ def create_animation(
             )
         )
 
-        if current_hour in (
-            2,
-            3,
-            4,
+        if (
+            2 <= current_time < 5
         ):
-            state = "LOW ACTIVITY"
 
-        elif current_hour in (
-            16,
-            17,
-        ):
-            state = "LATE-AFTERNOON PEAK"
+            state = (
+                "LOW ACTIVITY"
+            )
 
-        elif current_hour in (
-            5,
-            6,
-            7,
+        elif (
+            16 <= current_time < 18
         ):
-            state = "MORNING RISE"
+
+            state = (
+                "LATE-AFTERNOON PEAK"
+            )
+
+        elif (
+            5 <= current_time < 8
+        ):
+
+            state = (
+                "MORNING RISE"
+            )
 
         else:
-            state = "DAILY MOVEMENT"
+
+            state = (
+                "DAILY MOVEMENT"
+            )
 
         state_text.set_text(
             state
         )
 
         return (
-            active_layer,
+            flowing_layer,
             pointer_line,
             current_dot,
             progress_line,
@@ -1085,11 +1325,16 @@ def create_animation(
             movement_text,
         )
 
+
+    # ========================================================
+    # SAVE
+    # ========================================================
+
     animation = FuncAnimation(
         fig,
         update,
         frames=total_frames,
-        interval=120,
+        interval=80,
         repeat=True,
         blit=False,
     )
@@ -1100,22 +1345,19 @@ def create_animation(
     )
 
     print(
-        "Rendering 24-hour rhythm..."
-    )
-
-    print(
-        "This may take a little while."
+        "Rendering continuous flow test..."
     )
 
     animation.save(
         OUTPUT,
         writer=PillowWriter(
-            fps=9
+            fps=12
         ),
-        dpi=120,
+        dpi=110,
     )
 
     print()
+
     print(
         "Saved:",
         OUTPUT,
@@ -1129,6 +1371,7 @@ def create_animation(
 # ============================================================
 
 def main():
+
     print(
         "Reading elephant tracking data..."
     )
@@ -1142,7 +1385,7 @@ def main():
     )
 
     print(
-        "Preparing ~30-minute movement steps..."
+        "Preparing continuous flow data..."
     )
 
     animation_data = (
@@ -1159,7 +1402,7 @@ def main():
     )
 
     print(
-        "Historical movement segments:",
+        "Movement segments:",
         len(
             animation_data[
                 "historical_segments"
