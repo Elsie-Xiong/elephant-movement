@@ -3,7 +3,7 @@
 # dependencies = [
 #   "matplotlib",
 #   "numpy",
-#   "scipy",
+#   "pillow",
 # ]
 # ///
 
@@ -15,19 +15,60 @@ from math import cos, radians
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 import numpy as np
-
-from scipy.ndimage import gaussian_filter
-from scipy.interpolate import RegularGridInterpolator
+from PIL import Image
 
 
-DATA = Path("data/ThermochronTracking Elephants Kruger 2007.csv")
-OUTPUT = Path("out/tracking-landscape-v6.png")
+DATA = Path("data")
+TRACKING_FILE = DATA / "ThermochronTracking Elephants Kruger 2007.csv"
+OUTPUT = Path("out/real-terrain-tracking-test.png")
 
 EARTH_KM_PER_DEGREE = 111.32
 
 
 # ------------------------------------------------------------
-# DATA
+# STUDY AREA
+# ------------------------------------------------------------
+
+GPS_LAT_MIN = -25.37676
+GPS_LAT_MAX = -23.97868
+GPS_LON_MIN = 31.06269
+GPS_LON_MAX = 32.00439
+
+MARGIN = 0.04
+
+PIXELS_PER_DEGREE = 500
+
+
+TILES = [
+    {
+        "name": "Copernicus_DSM_COG_10_S26_00_E031_00_DEM.tif",
+        "south": -26,
+        "north": -25,
+        "west": 31,
+    },
+    {
+        "name": "Copernicus_DSM_COG_10_S25_00_E031_00_DEM.tif",
+        "south": -25,
+        "north": -24,
+        "west": 31,
+    },
+    {
+        "name": "Copernicus_DSM_COG_10_S25_00_E032_00_DEM.tif",
+        "south": -25,
+        "north": -24,
+        "west": 32,
+    },
+    {
+        "name": "Copernicus_DSM_COG_10_S24_00_E031_00_DEM.tif",
+        "south": -24,
+        "north": -23,
+        "west": 31,
+    },
+]
+
+
+# ------------------------------------------------------------
+# TRACKING DATA
 # ------------------------------------------------------------
 
 def parse_time(timestamp):
@@ -39,7 +80,7 @@ def parse_time(timestamp):
 def read_tracks():
     tracks = {}
 
-    with DATA.open(encoding="utf-8") as f:
+    with TRACKING_FILE.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         for row in reader:
@@ -51,8 +92,8 @@ def read_tracks():
             tracks.setdefault(elephant_id, []).append(
                 {
                     "time": parse_time(row["timestamp"]),
-                    "longitude": float(row["location-long"]),
-                    "latitude": float(row["location-lat"]),
+                    "lon": float(row["location-long"]),
+                    "lat": float(row["location-lat"]),
                 }
             )
 
@@ -64,212 +105,198 @@ def read_tracks():
     return tracks
 
 
-def calculate_reference_point(tracks):
-    longitudes = []
-    latitudes = []
+# ------------------------------------------------------------
+# REAL COPERNICUS TERRAIN
+# ------------------------------------------------------------
 
-    for points in tracks.values():
-        for point in points:
-            longitudes.append(point["longitude"])
-            latitudes.append(point["latitude"])
+def load_tile(path):
+    with Image.open(path) as image:
+        reduced = image.resize(
+            (PIXELS_PER_DEGREE, PIXELS_PER_DEGREE),
+            resample=Image.Resampling.BILINEAR,
+        )
+
+        return np.array(
+            reduced,
+            dtype=np.float32,
+        )
+
+
+def build_mosaic():
+    width = 2 * PIXELS_PER_DEGREE
+    height = 3 * PIXELS_PER_DEGREE
+
+    mosaic = np.full(
+        (height, width),
+        np.nan,
+        dtype=np.float32,
+    )
+
+    for tile in TILES:
+        terrain = load_tile(
+            DATA / tile["name"]
+        )
+
+        row = int(
+            -23 - tile["north"]
+        )
+
+        col = int(
+            tile["west"] - 31
+        )
+
+        y0 = row * PIXELS_PER_DEGREE
+        y1 = y0 + PIXELS_PER_DEGREE
+
+        x0 = col * PIXELS_PER_DEGREE
+        x1 = x0 + PIXELS_PER_DEGREE
+
+        mosaic[y0:y1, x0:x1] = terrain
+
+    return mosaic
+
+
+def crop_terrain(mosaic):
+    lon_min = GPS_LON_MIN - MARGIN
+    lon_max = GPS_LON_MAX + MARGIN
+
+    lat_min = GPS_LAT_MIN - MARGIN
+    lat_max = GPS_LAT_MAX + MARGIN
+
+    x0 = int(
+        (lon_min - 31)
+        * PIXELS_PER_DEGREE
+    )
+
+    x1 = int(
+        (lon_max - 31)
+        * PIXELS_PER_DEGREE
+    )
+
+    y0 = int(
+        (-23 - lat_max)
+        * PIXELS_PER_DEGREE
+    )
+
+    y1 = int(
+        (-23 - lat_min)
+        * PIXELS_PER_DEGREE
+    )
+
+    elevation = mosaic[
+        y0:y1,
+        x0:x1,
+    ]
+
+    longitudes = np.linspace(
+        lon_min,
+        lon_max,
+        elevation.shape[1],
+    )
+
+    latitudes = np.linspace(
+        lat_max,
+        lat_min,
+        elevation.shape[0],
+    )
+
+    # Mask the tiny number of suspicious negative pixels.
+    elevation[elevation < 0] = np.nan
 
     return (
-        sum(longitudes) / len(longitudes),
-        sum(latitudes) / len(latitudes),
+        elevation,
+        longitudes,
+        latitudes,
+        lon_min,
+        lon_max,
+        lat_min,
+        lat_max,
     )
 
 
-def to_local_km(
-    longitude,
-    latitude,
-    reference_lon,
-    reference_lat,
-):
+# ------------------------------------------------------------
+# COORDINATES
+# ------------------------------------------------------------
+
+def geographic_to_local_km(lon, lat):
+    centre_lon = (
+        GPS_LON_MIN + GPS_LON_MAX
+    ) / 2
+
+    centre_lat = (
+        GPS_LAT_MIN + GPS_LAT_MAX
+    ) / 2
+
     x = (
-        (longitude - reference_lon)
+        (lon - centre_lon)
         * EARTH_KM_PER_DEGREE
-        * cos(radians(reference_lat))
+        * cos(radians(centre_lat))
     )
 
     y = (
-        (latitude - reference_lat)
+        (lat - centre_lat)
         * EARTH_KM_PER_DEGREE
     )
 
     return x, y
 
 
-def build_visual_data(
-    tracks,
-    reference_lon,
-    reference_lat,
+def elevation_at(
+    lon,
+    lat,
+    elevation,
+    lon_min,
+    lon_max,
+    lat_min,
+    lat_max,
 ):
-    all_x = []
-    all_y = []
-    valid_segments = []
+    """Nearest-pixel DSM elevation at one GPS location."""
 
-    start_time = None
-    end_time = None
-
-    for elephant_id in sorted(tracks):
-        projected = []
-
-        for point in tracks[elephant_id]:
-            x, y = to_local_km(
-                point["longitude"],
-                point["latitude"],
-                reference_lon,
-                reference_lat,
-            )
-
-            projected.append(
-                {
-                    "time": point["time"],
-                    "x": x,
-                    "y": y,
-                }
-            )
-
-            all_x.append(x)
-            all_y.append(y)
-
-            if start_time is None or point["time"] < start_time:
-                start_time = point["time"]
-
-            if end_time is None or point["time"] > end_time:
-                end_time = point["time"]
-
-        for i in range(1, len(projected)):
-            previous = projected[i - 1]
-            current = projected[i]
-
-            gap_minutes = (
-                current["time"] - previous["time"]
-            ).total_seconds() / 60
-
-            if 29 <= gap_minutes <= 31:
-                valid_segments.append(
-                    [
-                        (
-                            previous["x"],
-                            previous["y"],
-                        ),
-                        (
-                            current["x"],
-                            current["y"],
-                        ),
-                    ]
-                )
-
-    return (
-        np.array(all_x),
-        np.array(all_y),
-        valid_segments,
-        start_time,
-        end_time,
+    col = int(
+        (lon - lon_min)
+        / (lon_max - lon_min)
+        * (elevation.shape[1] - 1)
     )
 
-
-# ------------------------------------------------------------
-# GPS DENSITY → DATA TERRAIN
-# ------------------------------------------------------------
-
-def build_density_terrain(
-    x,
-    y,
-    bins=300,
-):
-    margin_x = (x.max() - x.min()) * 0.04
-    margin_y = (y.max() - y.min()) * 0.04
-
-    x_min = x.min() - margin_x
-    x_max = x.max() + margin_x
-
-    y_min = y.min() - margin_y
-    y_max = y.max() + margin_y
-
-    density, x_edges, y_edges = np.histogram2d(
-        x,
-        y,
-        bins=bins,
-        range=[
-            [x_min, x_max],
-            [y_min, y_max],
-        ],
+    row = int(
+        (lat_max - lat)
+        / (lat_max - lat_min)
+        * (elevation.shape[0] - 1)
     )
 
-    density = density.T
-
-    # Broad smoothing creates continuous spatial structure,
-    # but the result will be rendered as POINTS, not a surface.
-    terrain = gaussian_filter(
-        density,
-        sigma=5.0,
+    col = np.clip(
+        col,
+        0,
+        elevation.shape[1] - 1,
     )
 
-    terrain = np.log1p(terrain)
-
-    if terrain.max() > 0:
-        terrain /= terrain.max()
-
-    # Reveal middle-density areas as part of the terrain.
-    terrain = terrain ** 0.58
-
-    x_centres = (
-        x_edges[:-1] + x_edges[1:]
-    ) / 2
-
-    y_centres = (
-        y_edges[:-1] + y_edges[1:]
-    ) / 2
-
-    X, Y = np.meshgrid(
-        x_centres,
-        y_centres,
+    row = np.clip(
+        row,
+        0,
+        elevation.shape[0] - 1,
     )
 
-    return (
-        terrain,
-        X,
-        Y,
-        x_centres,
-        y_centres,
-    )
+    value = elevation[row, col]
 
+    if not np.isfinite(value):
+        return np.nanmedian(elevation)
 
-def build_height_interpolator(
-    x_centres,
-    y_centres,
-    terrain,
-):
-    return RegularGridInterpolator(
-        (
-            y_centres,
-            x_centres,
-        ),
-        terrain,
-        bounds_error=False,
-        fill_value=0,
-    )
+    return float(value)
 
 
 # ------------------------------------------------------------
 # 2.5D PROJECTION
 # ------------------------------------------------------------
 
-def project_25d(
-    x,
-    y,
-    z,
-):
+def project_25d(x, y, elevation, minimum_elevation):
     """
-    Convert data-space x/y/z into a 2D oblique projection.
+    x/y = real geographic position in local kilometres
+    elevation = real Copernicus DSM surface elevation
 
-    x/y = real relative GPS position.
-    z   = relative tracking density, NOT elevation.
+    Vertical exaggeration is visual only.
     """
 
-    angle = np.radians(-8)
+    angle = radians(-8)
 
     rotated_x = (
         x * np.cos(angle)
@@ -281,108 +308,289 @@ def project_25d(
         + y * np.cos(angle)
     )
 
-    # Keep strong map readability.
+    relative_height_km = (
+        elevation - minimum_elevation
+    ) / 1000
+
+    VERTICAL_EXAGGERATION = 5.0
+
     screen_x = rotated_x
 
-    # Compress north/south direction slightly,
-    # then lift higher-density points upward.
     screen_y = (
         rotated_y * 0.72
-        + z * 24.0
+        + relative_height_km
+        * VERTICAL_EXAGGERATION
     )
 
     return screen_x, screen_y
 
 
-def prepare_tracking_projection(
-    all_x,
-    all_y,
-    valid_segments,
-    height_interpolator,
-):
+# ------------------------------------------------------------
+# DRAW
+# ------------------------------------------------------------
+
+def draw():
+    tracks = read_tracks()
+
+    mosaic = build_mosaic()
+
+    (
+        elevation,
+        longitudes,
+        latitudes,
+        lon_min,
+        lon_max,
+        lat_min,
+        lat_max,
+    ) = crop_terrain(
+        mosaic
+    )
+
+    minimum_elevation = float(
+        np.nanmin(elevation)
+    )
+
+    maximum_elevation = float(
+        np.nanmax(elevation)
+    )
+
     # --------------------------------------------------------
-    # GPS points
+    # TERRAIN POINT GRID
+    #
+    # Sparse enough to read as digital points,
+    # not as one solid rectangular surface.
     # --------------------------------------------------------
 
-    point_coordinates = np.column_stack(
-        [
-            all_y,
-            all_x,
-        ]
+    terrain_step = 5
+
+    lon_grid, lat_grid = np.meshgrid(
+        longitudes[::terrain_step],
+        latitudes[::terrain_step],
     )
 
-    point_z = height_interpolator(
-        point_coordinates
+    terrain_elevation = elevation[
+        ::terrain_step,
+        ::terrain_step,
+    ]
+
+    valid_terrain = np.isfinite(
+        terrain_elevation
     )
 
-    point_screen_x, point_screen_y = project_25d(
-        all_x,
-        all_y,
-        point_z,
+    terrain_x, terrain_y = geographic_to_local_km(
+        lon_grid,
+        lat_grid,
+    )
+
+    (
+        terrain_screen_x,
+        terrain_screen_y,
+    ) = project_25d(
+        terrain_x,
+        terrain_y,
+        terrain_elevation,
+        minimum_elevation,
     )
 
     # --------------------------------------------------------
-    # Track segments
+    # REAL ELEPHANT TRACKING POINTS + SEGMENTS
     # --------------------------------------------------------
 
-    segment_array = np.array(
-        valid_segments,
-        dtype=float,
+    gps_x = []
+    gps_y = []
+    gps_screen_x = []
+    gps_screen_y = []
+
+    projected_segments = []
+
+    for elephant_id in sorted(tracks):
+        points = tracks[elephant_id]
+
+        projected_points = []
+
+        for point in points:
+            x, y = geographic_to_local_km(
+                point["lon"],
+                point["lat"],
+            )
+
+            z = elevation_at(
+                point["lon"],
+                point["lat"],
+                elevation,
+                lon_min,
+                lon_max,
+                lat_min,
+                lat_max,
+            )
+
+            sx, sy = project_25d(
+                x,
+                y,
+                z,
+                minimum_elevation,
+            )
+
+            gps_x.append(x)
+            gps_y.append(y)
+            gps_screen_x.append(sx)
+            gps_screen_y.append(sy)
+
+            projected_points.append(
+                {
+                    "time": point["time"],
+                    "sx": sx,
+                    "sy": sy,
+                }
+            )
+
+        for i in range(1, len(projected_points)):
+            previous = projected_points[i - 1]
+            current = projected_points[i]
+
+            gap_minutes = (
+                current["time"] - previous["time"]
+            ).total_seconds() / 60
+
+            if 29 <= gap_minutes <= 31:
+                projected_segments.append(
+                    [
+                        (
+                            previous["sx"],
+                            previous["sy"],
+                        ),
+                        (
+                            current["sx"],
+                            current["sy"],
+                        ),
+                    ]
+                )
+
+    gps_screen_x = np.array(
+        gps_screen_x
     )
 
-    flat_xy = segment_array.reshape(
-        -1,
-        2,
+    gps_screen_y = np.array(
+        gps_screen_y
     )
 
-    segment_coordinates = np.column_stack(
-        [
-            flat_xy[:, 1],
-            flat_xy[:, 0],
-        ]
+    # --------------------------------------------------------
+    # FIGURE
+    # --------------------------------------------------------
+
+    fig = plt.figure(
+        figsize=(16, 9),
+        facecolor="#06090a",
     )
 
-    flat_z = height_interpolator(
-        segment_coordinates
+    ax = fig.add_axes(
+        [0.08, 0.035, 0.84, 0.92]
     )
 
-    flat_screen_x, flat_screen_y = project_25d(
-        flat_xy[:, 0],
-        flat_xy[:, 1],
-        flat_z,
+    ax.set_facecolor(
+        "#06090a"
     )
 
-    projected_segments = np.column_stack(
-        [
-            flat_screen_x,
-            flat_screen_y,
-        ]
-    ).reshape(
-        -1,
-        2,
-        2,
+    # --------------------------------------------------------
+    # 1. REAL TERRAIN — DIGITAL POINT FIELD
+    # --------------------------------------------------------
+
+    normalized_elevation = (
+        terrain_elevation
+        - minimum_elevation
+    ) / (
+        maximum_elevation
+        - minimum_elevation
     )
 
-    return (
-        point_screen_x,
-        point_screen_y,
-        point_z,
+    ax.scatter(
+        terrain_screen_x[valid_terrain],
+        terrain_screen_y[valid_terrain],
+        s=0.34,
+        c=normalized_elevation[valid_terrain],
+        cmap="Greys",
+        vmin=0,
+        vmax=1,
+        alpha=0.28,
+        linewidths=0,
+        zorder=1,
+    )
+
+    # --------------------------------------------------------
+    # 2. REAL ELEPHANT TRAJECTORIES
+    # --------------------------------------------------------
+
+    tracks_layer = LineCollection(
         projected_segments,
+        colors="#d7e3df",
+        linewidths=0.16,
+        alpha=0.10,
+        zorder=3,
     )
 
+    ax.add_collection(
+        tracks_layer
+    )
 
-# ------------------------------------------------------------
-# UI
-# ------------------------------------------------------------
+    # --------------------------------------------------------
+    # 3. REAL GPS OBSERVATIONS
+    # --------------------------------------------------------
 
-def add_interface(
-    fig,
-    elephant_count,
-    observation_count,
-    segment_count,
-    start_time,
-    end_time,
-):
+    ax.scatter(
+        gps_screen_x,
+        gps_screen_y,
+        s=0.13,
+        color="#edf4f1",
+        alpha=0.18,
+        linewidths=0,
+        zorder=4,
+    )
+
+    # --------------------------------------------------------
+    # FRAME
+    # --------------------------------------------------------
+
+    all_x = np.concatenate(
+        [
+            terrain_screen_x[valid_terrain],
+            gps_screen_x,
+        ]
+    )
+
+    all_y = np.concatenate(
+        [
+            terrain_screen_y[valid_terrain],
+            gps_screen_y,
+        ]
+    )
+
+    x_min = np.nanmin(all_x)
+    x_max = np.nanmax(all_x)
+
+    y_min = np.nanmin(all_y)
+    y_max = np.nanmax(all_y)
+
+    ax.set_xlim(
+        x_min - (x_max - x_min) * 0.03,
+        x_max + (x_max - x_min) * 0.03,
+    )
+
+    ax.set_ylim(
+        y_min - (y_max - y_min) * 0.03,
+        y_max + (y_max - y_min) * 0.03,
+    )
+
+    ax.set_aspect(
+        "equal",
+        adjustable="box",
+    )
+
+    ax.axis("off")
+
+    # --------------------------------------------------------
+    # UI
+    # --------------------------------------------------------
+
     fig.text(
         0.045,
         0.936,
@@ -397,7 +605,7 @@ def add_interface(
     fig.text(
         0.045,
         0.903,
-        "ELEPHANT MOVEMENT / KRUGER / 2007—2009",
+        "ELEPHANT TRACKING / REAL COPERNICUS TERRAIN",
         color="#61716d",
         fontsize=6.8,
         ha="left",
@@ -405,15 +613,14 @@ def add_interface(
     )
 
     info = (
-        f"TRACKED INDIVIDUALS   {elephant_count:02d}\n"
-        f"GPS OBSERVATIONS      {observation_count:,}\n"
-        f"30 MIN SEGMENTS       {segment_count:,}\n"
-        f"STUDY START           {start_time:%Y.%m.%d}\n"
-        f"STUDY END             {end_time:%Y.%m.%d}"
+        f"TRACKED INDIVIDUALS   {len(tracks):02d}\n"
+        f"GPS OBSERVATIONS      {len(gps_screen_x):,}\n"
+        f"TRACK SEGMENTS        {len(projected_segments):,}\n"
+        f"DSM RANGE             {minimum_elevation:.0f}–{maximum_elevation:.0f} M"
     )
 
     fig.text(
-        0.815,
+        0.805,
         0.924,
         info,
         color="#687873",
@@ -426,240 +633,23 @@ def add_interface(
 
     fig.text(
         0.045,
-        0.087,
-        "XY POSITION      GPS LOCATION\n"
-        "POINT HEIGHT     RELATIVE GPS OBSERVATION DENSITY\n"
-        "TRACK LINES      CONSECUTIVE 29–31 MIN OBSERVATIONS",
-        color="#52615d",
-        fontsize=5.2,
-        family="monospace",
-        linespacing=1.55,
-        ha="left",
-        va="bottom",
-    )
-
-    fig.text(
-        0.045,
-        0.048,
-        "TRACKING RECORDS FORM THE LANDSCAPE",
+        0.050,
+        "REAL TERRAIN + REAL TRACKING RECORDS",
         color="#667671",
-        fontsize=6,
+        fontsize=5.8,
         ha="left",
         va="bottom",
     )
 
     fig.text(
         0.955,
-        0.048,
-        "NO BASEMAP  /  POINT HEIGHT REPRESENTS TRACKING DENSITY, NOT ELEVATION",
+        0.050,
+        "TERRAIN HEIGHT = COPERNICUS DSM  /  TRACKS = CONSECUTIVE 29–31 MIN GPS RECORDS",
         color="#495753",
-        fontsize=5.2,
+        fontsize=5.0,
         family="monospace",
         ha="right",
         va="bottom",
-    )
-
-
-# ------------------------------------------------------------
-# DRAW
-# ------------------------------------------------------------
-
-def draw_landscape(tracks):
-    reference_lon, reference_lat = calculate_reference_point(
-        tracks
-    )
-
-    (
-        all_x,
-        all_y,
-        valid_segments,
-        start_time,
-        end_time,
-    ) = build_visual_data(
-        tracks,
-        reference_lon,
-        reference_lat,
-    )
-
-    (
-        terrain,
-        X,
-        Y,
-        x_centres,
-        y_centres,
-    ) = build_density_terrain(
-        all_x,
-        all_y,
-    )
-
-    height_interpolator = build_height_interpolator(
-        x_centres,
-        y_centres,
-        terrain,
-    )
-
-    (
-        point_screen_x,
-        point_screen_y,
-        point_z,
-        projected_segments,
-    ) = prepare_tracking_projection(
-        all_x,
-        all_y,
-        valid_segments,
-        height_interpolator,
-    )
-
-    # --------------------------------------------------------
-    # TERRAIN GRID POINTS
-    # --------------------------------------------------------
-
-    terrain_mask = terrain > 0.075
-
-    terrain_x = X[terrain_mask]
-    terrain_y = Y[terrain_mask]
-    terrain_z = terrain[terrain_mask]
-
-    (
-        terrain_screen_x,
-        terrain_screen_y,
-    ) = project_25d(
-        terrain_x,
-        terrain_y,
-        terrain_z,
-    )
-
-    fig = plt.figure(
-        figsize=(16, 9),
-        facecolor="#06090a",
-    )
-
-    ax = fig.add_axes(
-        [0.08, 0.035, 0.84, 0.92]
-    )
-
-    ax.set_facecolor("#06090a")
-
-    # --------------------------------------------------------
-    # LAYER 1 — POINT-GRID DATA TERRAIN
-    #
-    # No surface.
-    # No glow.
-    # Every visible terrain mark is an individual grid point.
-    # --------------------------------------------------------
-
-    terrain_sizes = (
-        0.4
-        + terrain_z * 2.0
-    )
-
-    ax.scatter(
-        terrain_screen_x,
-        terrain_screen_y,
-        s=terrain_sizes,
-        c=terrain_z,
-        cmap="Greys",
-        vmin=0,
-        vmax=1,
-        alpha=0.52,
-        linewidths=0,
-        zorder=1,
-    )
-
-    # --------------------------------------------------------
-    # LAYER 2 — REAL TRAJECTORY FRAGMENTS
-    # --------------------------------------------------------
-
-    track_collection = LineCollection(
-        projected_segments,
-        colors="#8fa29c",
-        linewidths=0.13,
-        alpha=0.055,
-        zorder=2,
-    )
-
-    ax.add_collection(
-        track_collection
-    )
-
-    # --------------------------------------------------------
-    # LAYER 3 — ALL REAL GPS OBSERVATIONS
-    # --------------------------------------------------------
-
-    ax.scatter(
-        point_screen_x,
-        point_screen_y,
-        s=0.10,
-        color="#dfe8e4",
-        alpha=0.12,
-        linewidths=0,
-        zorder=3,
-    )
-
-    # Slightly emphasise locations where density is higher.
-    high_density = point_z > 0.55
-
-    ax.scatter(
-        point_screen_x[high_density],
-        point_screen_y[high_density],
-        s=0.18,
-        color="#e8efec",
-        alpha=0.15,
-        linewidths=0,
-        zorder=4,
-    )
-
-    # --------------------------------------------------------
-    # FRAME
-    # --------------------------------------------------------
-
-    all_screen_x = np.concatenate(
-        [
-            terrain_screen_x,
-            point_screen_x,
-        ]
-    )
-
-    all_screen_y = np.concatenate(
-        [
-            terrain_screen_y,
-            point_screen_y,
-        ]
-    )
-
-    x_min = all_screen_x.min()
-    x_max = all_screen_x.max()
-
-    y_min = all_screen_y.min()
-    y_max = all_screen_y.max()
-
-    x_pad = (x_max - x_min) * 0.035
-    y_pad = (y_max - y_min) * 0.035
-
-    ax.set_xlim(
-        x_min - x_pad,
-        x_max + x_pad,
-    )
-
-    ax.set_ylim(
-        y_min - y_pad,
-        y_max + y_pad,
-    )
-
-    ax.set_aspect(
-        "equal",
-        adjustable="box",
-    )
-
-    ax.axis("off")
-
-    add_interface(
-        fig,
-        elephant_count=len(tracks),
-        observation_count=len(all_x),
-        segment_count=len(valid_segments),
-        start_time=start_time,
-        end_time=end_time,
     )
 
     OUTPUT.parent.mkdir(
@@ -673,25 +663,22 @@ def draw_landscape(tracks):
         facecolor=fig.get_facecolor(),
     )
 
-    print("TRACKING LANDSCAPE — POINT GRID TERRAIN")
-    print("---------------------------------------")
+    print("REAL TERRAIN + ELEPHANT TRACKING TEST")
+    print("-------------------------------------")
     print("Tracked individuals:", len(tracks))
-    print("GPS observations:", len(all_x))
-    print("Valid 29–31 min segments:", len(valid_segments))
-    print("Terrain grid points:", len(terrain_x))
+    print("GPS observations:", len(gps_screen_x))
+    print("Valid trajectory segments:", len(projected_segments))
     print(
-        "Terrain height meaning:",
-        "relative GPS observation density",
+        "DSM range:",
+        round(minimum_elevation, 2),
+        "to",
+        round(maximum_elevation, 2),
+        "m",
     )
     print("Saved:", OUTPUT)
 
     plt.show()
 
 
-def main():
-    tracks = read_tracks()
-    draw_landscape(tracks)
-
-
 if __name__ == "__main__":
-    main()
+    draw()
