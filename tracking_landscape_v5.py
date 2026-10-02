@@ -32,8 +32,8 @@ EARTH_KM_PER_DEGREE = 111.32
 
 BACKGROUND = "#07090A"
 
-HISTORICAL_LINE = "#9D9B96"
-HISTORICAL_POINT = "#D4D1CA"
+HISTORICAL_LINE = "#918F8A"
+HISTORICAL_POINT = "#CBC8C1"
 
 MOVEMENT_TEAL = "#32C7B5"
 MOVEMENT_TEAL_BRIGHT = "#79E1D3"
@@ -206,31 +206,13 @@ def distance_km(
 
     earth_radius = 6371.0
 
-    lat1 = radians(
-        lat1
-    )
+    lat1 = radians(lat1)
+    lon1 = radians(lon1)
+    lat2 = radians(lat2)
+    lon2 = radians(lon2)
 
-    lon1 = radians(
-        lon1
-    )
-
-    lat2 = radians(
-        lat2
-    )
-
-    lon2 = radians(
-        lon2
-    )
-
-    d_lat = (
-        lat2
-        - lat1
-    )
-
-    d_lon = (
-        lon2
-        - lon1
-    )
+    d_lat = lat2 - lat1
+    d_lon = lon2 - lon1
 
     a = (
         sin(
@@ -348,7 +330,6 @@ def build_data(
     all_y = []
 
     historical_segments = []
-
     peak_segments = []
 
     hourly_movements = {
@@ -518,8 +499,7 @@ def build_data(
                 / 2
             )
 
-            # South Africa local time
-            # = UTC + 2.
+            # South Africa local time = UTC + 2.
             midpoint_local = (
                 midpoint_utc
                 + timedelta(
@@ -584,9 +564,7 @@ def build_data(
     # --------------------------------------------------------
 
     monthly_medians = {}
-
     monthly_peak_hours = {}
-
     monthly_peak_values = {}
 
     for month in range(
@@ -707,17 +685,15 @@ def draw_landscape(
         BACKGROUND
     )
 
-    # --------------------------------------------------------
-    # HISTORICAL MOVEMENT MEMORY
-    # --------------------------------------------------------
-
+    # Historical layer intentionally reduced
+    # so analytical teal movement can stand out.
     historical = LineCollection(
         visual_data[
             "historical_segments"
         ],
         colors=HISTORICAL_LINE,
-        linewidths=0.14,
-        alpha=0.043,
+        linewidths=0.13,
+        alpha=0.027,
         zorder=1,
     )
 
@@ -732,9 +708,9 @@ def draw_landscape(
         visual_data[
             "all_y"
         ],
-        s=0.14,
+        s=0.13,
         color=HISTORICAL_POINT,
-        alpha=0.11,
+        alpha=0.075,
         linewidths=0,
         zorder=2,
     )
@@ -745,8 +721,8 @@ def draw_landscape(
     # Brighter / thicker =
     # longer ~30 min displacement.
     #
-    # P95 is only used to cap visual scaling.
-    # No GPS record is removed.
+    # P95 only caps visual scaling.
+    # No movement records are removed.
     # --------------------------------------------------------
 
     peak_movements = [
@@ -786,15 +762,15 @@ def draw_landscape(
         )
 
         alpha = (
-            0.055
+            0.08
             + strength
-            * 0.33
+            * 0.43
         )
 
         linewidth = (
-            0.15
+            0.17
             + strength
-            * 0.38
+            * 0.46
         )
 
         segments.append(
@@ -879,7 +855,7 @@ def draw_landscape(
         0.842,
         "01  SPATIAL MEMORY",
         color=TEXT_MAIN,
-        fontsize=6.2,
+        fontsize=6.4,
         family="monospace",
         ha="left",
         va="top",
@@ -887,13 +863,13 @@ def draw_landscape(
 
     fig.text(
         0.055,
-        0.819,
+        0.818,
         (
             "LONG-TERM GPS MOVEMENT "
             "+ LATE-AFTERNOON ACTIVITY"
         ),
         color=TEXT_SECONDARY,
-        fontsize=5.3,
+        fontsize=5.4,
         family="monospace",
         ha="left",
         va="top",
@@ -908,16 +884,6 @@ def draw_overall_rhythm(
     fig,
     visual_data,
 ):
-    """
-    24-hour circular rhythm.
-
-    Angle =
-    local hour.
-
-    Distance from inner ring =
-    median ~30 min displacement.
-    """
-
     values = visual_data[
         "overall_hourly_medians"
     ]
@@ -961,7 +927,7 @@ def draw_overall_rhythm(
         in closed_hours
     ]
 
-    base_radius = 1.0
+    base_radius = 0.95
 
     radii = []
 
@@ -978,15 +944,15 @@ def draw_overall_rhythm(
         radii.append(
             base_radius
             + normalized
-            * 0.55
+            * 0.58
         )
 
     ax = fig.add_axes(
         [
+            0.660,
             0.665,
-            0.675,
-            0.19,
-            0.19,
+            0.205,
+            0.205,
         ],
         projection="polar",
     )
@@ -995,18 +961,16 @@ def draw_overall_rhythm(
         BACKGROUND
     )
 
-    # Midnight at top.
     ax.set_theta_zero_location(
         "N"
     )
 
-    # Clockwise.
     ax.set_theta_direction(
         -1
     )
 
     # --------------------------------------------------------
-    # REFERENCE RING
+    # BASE REFERENCE RING
     # --------------------------------------------------------
 
     reference_theta = [
@@ -1036,6 +1000,32 @@ def draw_overall_rhythm(
     )
 
     # --------------------------------------------------------
+    # 24 HOUR MARKERS
+    # --------------------------------------------------------
+
+    hour_angles = [
+        2
+        * math.pi
+        * hour
+        / 24
+
+        for hour
+        in hours
+    ]
+
+    ax.scatter(
+        hour_angles,
+        [
+            1.64
+        ] * 24,
+        s=2.5,
+        color=TEXT_FAINT,
+        alpha=0.55,
+        linewidths=0,
+        zorder=1,
+    )
+
+    # --------------------------------------------------------
     # RHYTHM BODY
     # --------------------------------------------------------
 
@@ -1047,7 +1037,7 @@ def draw_overall_rhythm(
         * len(theta),
         radii,
         color=MOVEMENT_TEAL,
-        alpha=0.10,
+        alpha=0.11,
         zorder=2,
     )
 
@@ -1055,8 +1045,8 @@ def draw_overall_rhythm(
         theta,
         radii,
         color=MOVEMENT_TEAL,
-        linewidth=1.35,
-        alpha=0.95,
+        linewidth=1.45,
+        alpha=0.98,
         zorder=3,
     )
 
@@ -1098,7 +1088,7 @@ def draw_overall_rhythm(
         return (
             base_radius
             + normalized
-            * 0.55
+            * 0.58
         )
 
     minimum_theta = (
@@ -1124,7 +1114,7 @@ def draw_overall_rhythm(
                 minimum_hour
             )
         ],
-        s=24,
+        s=28,
         color=MOVEMENT_TEAL_BRIGHT,
         linewidths=0,
         zorder=5,
@@ -1139,7 +1129,7 @@ def draw_overall_rhythm(
                 maximum_hour
             )
         ],
-        s=28,
+        s=31,
         color=MOVEMENT_TEAL_BRIGHT,
         linewidths=0,
         zorder=5,
@@ -1181,13 +1171,13 @@ def draw_overall_rhythm(
     ax.fill_between(
         peak_angles,
         [
-            0.92
+            0.86
         ]
         * len(
             peak_angles
         ),
         [
-            1.64
+            1.69
         ]
         * len(
             peak_angles
@@ -1221,18 +1211,37 @@ def draw_overall_rhythm(
 
         ax.text(
             angle,
-            1.72,
+            1.76,
             f"{hour:02d}",
             color=TEXT_FAINT,
-            fontsize=4.7,
+            fontsize=5.0,
             family="monospace",
             ha="center",
             va="center",
         )
 
+    # --------------------------------------------------------
+    # INNER READING KEY
+    # --------------------------------------------------------
+
+    ax.text(
+        0,
+        0.44,
+        (
+            "RADIUS = MEDIAN\n"
+            "~30 MIN DISPLACEMENT"
+        ),
+        color=TEXT_SECONDARY,
+        fontsize=4.6,
+        family="monospace",
+        ha="center",
+        va="center",
+        linespacing=1.35,
+    )
+
     ax.set_ylim(
-        0.90,
-        1.78,
+        0,
+        1.82,
     )
 
     ax.grid(
@@ -1258,69 +1267,69 @@ def draw_overall_rhythm(
     # --------------------------------------------------------
 
     fig.text(
-        0.585,
-        0.855,
+        0.565,
+        0.858,
         "02  DAILY RHYTHM",
         color=TEXT_MAIN,
-        fontsize=6.2,
+        fontsize=6.4,
         family="monospace",
         ha="left",
         va="top",
     )
 
     fig.text(
-        0.585,
-        0.832,
+        0.565,
+        0.833,
         "24H MOVEMENT CYCLE · LOCAL TIME",
         color=TEXT_SECONDARY,
-        fontsize=5.2,
+        fontsize=5.4,
         family="monospace",
         ha="left",
         va="top",
     )
 
     fig.text(
-        0.585,
-        0.775,
+        0.565,
+        0.768,
         "LOW",
         color=TEXT_FAINT,
-        fontsize=4.8,
+        fontsize=5.0,
         family="monospace",
         ha="left",
     )
 
     fig.text(
-        0.585,
-        0.755,
+        0.565,
+        0.746,
         (
             f"{minimum_hour:02d}:00  "
             f"{values[minimum_hour]:.3f} km"
         ),
         color=MOVEMENT_TEAL_BRIGHT,
-        fontsize=5.2,
+        fontsize=5.5,
         family="monospace",
         ha="left",
     )
 
     fig.text(
-        0.585,
-        0.720,
+        0.565,
+        0.708,
         "PEAK",
         color=TEXT_FAINT,
-        fontsize=4.8,
+        fontsize=5.0,
         family="monospace",
         ha="left",
     )
 
     fig.text(
-        0.585,
-        0.700,
+        0.565,
+        0.686,
         (
             f"{maximum_hour:02d}:00  "
             f"{values[maximum_hour]:.3f} km"
         ),
         color=MOVEMENT_TEAL_BRIGHT,
-        fontsize=5.2,
+        fontsize=5.5,
         family="monospace",
         ha="left",
     )
@@ -1334,25 +1343,12 @@ def draw_monthly_rhythms(
     fig,
     visual_data,
 ):
-    """
-    12 monthly rhythm ribbons.
-
-    Horizontal position =
-    local hour.
-
-    Ribbon thickness =
-    median ~30 min displacement.
-
-    All months use the same
-    movement scale.
-    """
-
     ax = fig.add_axes(
         [
-            0.585,
-            0.125,
-            0.355,
-            0.49,
+            0.565,
+            0.105,
+            0.395,
+            0.525,
         ]
     )
 
@@ -1382,10 +1378,6 @@ def draw_monthly_rhythms(
         ]
     )
 
-    # --------------------------------------------------------
-    # COMMON SCALE
-    # --------------------------------------------------------
-
     global_peak = max(
         monthly_peak_values.values()
     )
@@ -1398,12 +1390,12 @@ def draw_monthly_rhythms(
         15.5,
         17.5,
         color=MOVEMENT_TEAL,
-        alpha=0.045,
+        alpha=0.050,
         linewidth=0,
         zorder=0,
     )
 
-    ribbon_height = 0.52
+    ribbon_height = 0.56
 
     # --------------------------------------------------------
     # DRAW 12 RIBBONS
@@ -1454,7 +1446,6 @@ def draw_monthly_rhythms(
             in amplitudes
         ]
 
-        # Centre guide
         ax.plot(
             [
                 0,
@@ -1465,39 +1456,36 @@ def draw_monthly_rhythms(
                 baseline,
             ],
             color=GRID_FAINT,
-            linewidth=0.40,
-            alpha=0.65,
+            linewidth=0.42,
+            alpha=0.68,
             zorder=1,
         )
 
-        # Filled ribbon
         ax.fill_between(
             hours,
             lower,
             upper,
             color=MOVEMENT_TEAL,
-            alpha=0.10,
+            alpha=0.11,
             linewidth=0,
             zorder=2,
         )
 
-        # Upper contour
         ax.plot(
             hours,
             upper,
             color=MOVEMENT_TEAL,
-            linewidth=0.75,
-            alpha=0.70,
+            linewidth=0.82,
+            alpha=0.78,
             zorder=3,
         )
 
-        # Lower contour
         ax.plot(
             hours,
             lower,
             color=MOVEMENT_TEAL,
-            linewidth=0.45,
-            alpha=0.28,
+            linewidth=0.48,
+            alpha=0.30,
             zorder=2,
         )
 
@@ -1534,7 +1522,7 @@ def draw_monthly_rhythms(
             [
                 peak_y
             ],
-            s=14,
+            s=18,
             color=MOVEMENT_TEAL_BRIGHT,
             linewidths=0,
             zorder=5,
@@ -1548,7 +1536,7 @@ def draw_monthly_rhythms(
                 month - 1
             ],
             color=TEXT_SECONDARY,
-            fontsize=5.2,
+            fontsize=5.8,
             family="monospace",
             ha="right",
             va="center",
@@ -1560,7 +1548,7 @@ def draw_monthly_rhythms(
             baseline,
             f"{peak_value:.3f}",
             color=TEXT_SECONDARY,
-            fontsize=4.9,
+            fontsize=5.35,
             family="monospace",
             ha="left",
             va="center",
@@ -1615,8 +1603,8 @@ def draw_monthly_rhythms(
         ridge_x,
         ridge_y,
         color=MOVEMENT_TEAL_BRIGHT,
-        linewidth=0.75,
-        alpha=0.50,
+        linewidth=0.90,
+        alpha=0.60,
         linestyle="--",
         zorder=4,
     )
@@ -1627,13 +1615,13 @@ def draw_monthly_rhythms(
 
     ax.text(
         16.5,
-        13.10,
+        13.12,
         (
             "RECURRING PEAK RIDGE\n"
             "16–17H"
         ),
         color=MOVEMENT_TEAL_BRIGHT,
-        fontsize=5.3,
+        fontsize=5.8,
         family="monospace",
         ha="center",
         va="bottom",
@@ -1641,13 +1629,13 @@ def draw_monthly_rhythms(
 
     ax.text(
         24.0,
-        13.10,
+        13.12,
         (
             "PEAK KM\n"
             "/ ~30 MIN"
         ),
         color=TEXT_FAINT,
-        fontsize=4.7,
+        fontsize=5.1,
         family="monospace",
         ha="left",
         va="bottom",
@@ -1667,10 +1655,10 @@ def draw_monthly_rhythms(
 
         ax.text(
             hour,
-            0.30,
+            0.27,
             f"{hour:02d}",
             color=TEXT_FAINT,
-            fontsize=4.6,
+            fontsize=5.0,
             family="monospace",
             ha="center",
             va="bottom",
@@ -1682,8 +1670,8 @@ def draw_monthly_rhythms(
     )
 
     ax.set_ylim(
-        0.15,
-        13.75,
+        0.10,
+        13.80,
     )
 
     ax.axis(
@@ -1691,26 +1679,26 @@ def draw_monthly_rhythms(
     )
 
     fig.text(
-        0.585,
-        0.650,
+        0.565,
+        0.648,
         "03  RHYTHMS WITHIN RHYTHMS",
         color=TEXT_MAIN,
-        fontsize=6.2,
+        fontsize=6.5,
         family="monospace",
         ha="left",
         va="top",
     )
 
     fig.text(
-        0.585,
-        0.627,
+        0.565,
+        0.623,
         (
             "THE DAILY PULSE REPEATS, "
             "WHILE ITS AMPLITUDE CHANGES "
             "THROUGH THE YEAR."
         ),
         color=TEXT_SECONDARY,
-        fontsize=5.2,
+        fontsize=5.4,
         family="monospace",
         ha="left",
         va="top",
@@ -1726,10 +1714,6 @@ def add_interface(
     tracks,
     visual_data,
 ):
-    # --------------------------------------------------------
-    # TITLE
-    # --------------------------------------------------------
-
     fig.text(
         0.045,
         0.955,
@@ -1753,10 +1737,6 @@ def add_interface(
         ha="left",
         va="top",
     )
-
-    # --------------------------------------------------------
-    # MAIN FINDING
-    # --------------------------------------------------------
 
     fig.text(
         0.045,
@@ -1960,11 +1940,11 @@ def main():
     )
 
     print(
-        "LIVING RHYTHMS — RHYTHM VISUAL TEST"
+        "LIVING RHYTHMS — FINAL POLISH TEST"
     )
 
     print(
-        "-----------------------------------"
+        "----------------------------------"
     )
 
     print(
