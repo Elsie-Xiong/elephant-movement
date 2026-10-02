@@ -207,6 +207,72 @@ def main():
         "km",
     )
 
+def print_gps_bounds():
+    """Print geographic extent and occupied 1-degree tiles."""
+    latitudes = []
+    longitudes = []
+    tile_counts = {}
+
+    with open(
+        "data/ThermochronTracking Elephants Kruger 2007.csv",
+        encoding="utf-8",
+    ) as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            if row["location-long"] and row["location-lat"]:
+                lon = float(row["location-long"])
+                lat = float(row["location-lat"])
+
+                longitudes.append(lon)
+                latitudes.append(lat)
+
+                # Copernicus tiles are named by their
+                # south-west 1-degree corner.
+                south = int(lat // 1)
+                west = int(lon // 1)
+
+                tile = (south, west)
+
+                tile_counts[tile] = (
+                    tile_counts.get(tile, 0) + 1
+                )
+
+    print()
+    print("GPS BOUNDING BOX")
+    print("----------------")
+    print("Latitude min:", min(latitudes))
+    print("Latitude max:", max(latitudes))
+    print("Longitude min:", min(longitudes))
+    print("Longitude max:", max(longitudes))
+
+    print()
+    print("OCCUPIED 1-DEGREE TILES")
+    print("-----------------------")
+
+    for tile, count in sorted(tile_counts.items()):
+        south, west = tile
+
+        lat_name = (
+            f"N{south:02d}"
+            if south >= 0
+            else f"S{abs(south):02d}"
+        )
+
+        lon_name = (
+            f"E{west:03d}"
+            if west >= 0
+            else f"W{abs(west):03d}"
+        )
+
+        print(
+            f"{lat_name}_{lon_name}:",
+            count,
+            "GPS records",
+        )
+
+print_gps_bounds()
+
 
 if __name__ == "__main__":
     main()
